@@ -1,6 +1,7 @@
+const { Emoji } = require("discord.js");
 const { updateGuide, createCategoryName, findChannelWithNameAndType, msToMinutesAndSeconds, handleCooldown } = require("../../services/service");
 const { sendEphemeral } = require("../utils");
-const Discord = require('discord.js');
+const Discord = require("discord.js");
 
 const used = new Map();
 
@@ -11,11 +12,18 @@ const execute = async (interaction, client, Groups) => {
 
     const channel = client.channels.cache.find(c => c.name === "general" && c.type === "text");
 
+    // let pollDescription = args.slice(1).join(' ');
+
     const exampleEmbed = new Discord.MessageEmbed()
         .setColor('#0099ff')
-        .setTitle('Some title')
+        .setTitle('Kysely')
+        
+        let msgEmbed = await channel.send(exampleEmbed);
 
-    channel.send(exampleEmbed);
+        await msgEmbed.react('👍')
+        await msgEmbed.react('👎')
+
+    // channel.send(exampleEmbed);
 };
 
 module.exports = {
