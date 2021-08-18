@@ -1,6 +1,5 @@
-const { updateGuide, createCategoryName, findChannelWithNameAndType, msToMinutesAndSeconds, handleCooldown  } = require("../../services/service");
+const { MessageEmbed } = require('discord.js');
 const { sendEphemeral } = require("../utils");
-const Discord = require("discord.js");
 
 const execute = async (interaction, client, Groups) => {
     
@@ -30,7 +29,7 @@ const execute = async (interaction, client, Groups) => {
             answerOptions = answerOptions.concat(numbers[i] + ' = ' + answers[i] + '\n\n');
         }
 
-        const exampleEmbed = new Discord.MessageEmbed()
+        const exampleEmbed = new MessageEmbed()
             .setColor('#0099ff')
             .setTitle(pollTitle)
             .setDescription(answerOptions);
@@ -38,19 +37,23 @@ const execute = async (interaction, client, Groups) => {
         let msgEmbed = await channel.send(exampleEmbed);
 
         for (var i = 0, len = answers.length; i < len; i++) {
-            await msgEmbed.react(numbers[i]);
+            msgEmbed.react(numbers[i]);
         }
+
+        sendEphemeral(client, interaction, `Poll ready`);
 
     //If yes/no poll
     } else {
-        const exampleEmbed = new Discord.MessageEmbed()
+        const exampleEmbed = new MessageEmbed()
             .setColor('#0099ff')
             .setTitle(pollTitle)
 
         let msgEmbed = await channel.send(exampleEmbed);
-
+        
         await msgEmbed.react('👍')
         await msgEmbed.react('👎')
+
+        sendEphemeral(client, interaction, `Poll ready`);
     }
 };
 
