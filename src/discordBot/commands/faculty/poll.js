@@ -63,7 +63,7 @@ module.exports = {
   args: true,
   joinArgs: true,
   guide: true,
-  role: "teacher",
+  role: "faculty",
   options: [
     {
       name: "title",
