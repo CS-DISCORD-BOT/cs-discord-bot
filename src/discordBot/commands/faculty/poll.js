@@ -59,7 +59,7 @@ const execute = async (interaction, client) => {
 module.exports = {
   name: "poll",
   description: "Create a poll",
-  usage: "[course name]",
+  usage: "[poll title, <possible answers>]",
   args: true,
   joinArgs: true,
   guide: true,
