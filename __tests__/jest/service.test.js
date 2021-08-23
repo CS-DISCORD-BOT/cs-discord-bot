@@ -3,21 +3,66 @@ const {
   createPrivateCategoryName,
   getRoleFromCategory,
   findOrCreateRoleWithName,
-  updateFaculty,
   updateGuideMessage,
   createInvitation,
   findCategoryName,
-  createNewGroup,
-  removeGroup,
+  createCourseToDatabase,
+  removeCourseFromDb,
   findChannelWithNameAndType,
   findChannelWithId,
-  msToMinutesAndSeconds } = require("../../src/discordBot/services/service");
+  msToMinutesAndSeconds,
+  findOrCreateChannel,
+  setCoursePositionABC,
+  isACourseCategory,
+  trimCourseName,
+  findAllCourseNames } = require("../../src/discordBot/services/service");
 
-const Groups = {
+const createGuidePinnedMessage = async (guild) => {
+  const rows = courses
+    .map((course) => {
+      const code = course.code.toUpperCase();
+      const fullname = course.fullName.charAt(0).toUpperCase() + course.fullName.slice(1);
+      const count = guild.roles.cache.find(
+        (role) => role.name === course.name,
+      )?.members.size;
+      return `  - ${code} - ${fullname} - \`/join ${course.name}\` 👤${count}`;
+    });
+
+  let invite_url = "";
+  process.env.NODE_ENV === "production" ? invite_url = `${process.env.BACKEND_SERVER_URL}` : invite_url = `${process.env.BACKEND_SERVER_URL}:${process.env.PORT}`;
+
+  const newContent = `
+Käytössäsi on seuraavia komentoja:
+  - \`/join\` jolla voit liittyä kurssille
+  - \`/leave\` jolla voit poistua kurssilta
+Esim: \`/join ohpe\`
+  
+You have the following commands available:
+  - \`/join\` which you can use to join a course
+  - \`/leave\` which you can use to leave a course
+For example: \`/join ohpe\`
+
+Kurssit / Courses:
+${rows.join("\n")}
+
+In course specific channels you can also list instructors \`/instructors\`
+
+See more with \`/help\` command.
+
+Invitation link for the server ${invite_url}
+`;
+  return newContent;
+};
+
+const courses = [{ code: "tkt", fullName: "test course", name: "test" }];
+
+const Course = {
   create: jest.fn(),
   findOne: jest
     .fn(() => true)
+    .mockImplementationOnce(() => false)
     .mockImplementationOnce(() => false),
+  findAll: jest.fn(() => courses),
   destroy: jest.fn(),
 };
 
@@ -71,22 +116,17 @@ describe("Service", () => {
     expect(client.guild.roles.create).toHaveBeenCalledTimes(0);
   });
 
-  test("Update faculty", async () => {
-    await updateFaculty(client.guild);
-    expect(client.guild.roles.create).toHaveBeenCalledTimes(1);
-  });
-
-
   test("dont find invalid channel with name and type", () => {
     const channelFound = findChannelWithNameAndType("guide", "text", client.guild);
     expect(channelFound).toBeUndefined();
   });
 
   test("find valid channel with name and type", () => {
-    const channel = { name: "guide", type: "text" };
-    client.guild.channels.create("guide", "text");
+    const channelObject = { name: "guide", options: { type: "text" } };
+    client.guild.channels.create(channelObject.name, channelObject.options);
     const channelFound = findChannelWithNameAndType("guide", "text", client.guild);
-    expect(channelFound).toMatchObject(channel);
+    const result = { name: "guide", type: "text" };
+    expect(channelFound).toMatchObject(result);
   });
 
   test("find valid channel with id", () => {
@@ -104,9 +144,10 @@ describe("Service", () => {
     client.guild.channels.cache = [guide, commands, testCategory];
     client.guild.roles.cache = [role];
     const msg = { guild: client.guild, pin: jest.fn(), edit: jest.fn() };
-    await updateGuideMessage(msg);
-    expect(client.guild.fetchInvites).toHaveBeenCalledTimes(1);
+    const guideMessage = await createGuidePinnedMessage(client.guild, Course);
+    await updateGuideMessage(msg, Course);
     expect(msg.edit).toHaveBeenCalledTimes(1);
+    expect(msg.edit).toHaveBeenCalledWith(guideMessage);
     client.guild.channels.cache = [];
   });
 
@@ -154,34 +195,109 @@ describe("Service", () => {
     client.guild.channels.cache = [];
   });
 
-  test("create new group", () => {
+  test("create new group", async () => {
+    const courseCode = "tkt101";
+    const courseFullName = "test course";
     const courseString = "test";
-    const groupId = "987654321012";
-    createNewGroup([courseString, groupId], Groups);
-    expect(Groups.create).toHaveBeenCalledTimes(1);
-    expect(Groups.create).toHaveBeenCalledWith({ groupId: groupId, course: courseString });
+    await createCourseToDatabase(courseCode, courseFullName, courseString, Course);
+    // expect(Course.create).toHaveBeenCalledTimes(1);
+    expect(Course.create).toHaveBeenCalledWith({ code: courseCode, fullName: courseFullName, name: courseString, private: false });
   });
 
-  test("remove group - if no group dont destroy", () => {
+  test("remove group - if no group dont destroy", async () => {
     const courseString = "test";
-    removeGroup(courseString, Groups);
-    expect(Groups.findOne).toHaveBeenCalledTimes(1);
-    expect(Groups.findOne).toHaveBeenCalledWith({ where: { course: courseString } });
-    expect(Groups.destroy).toHaveBeenCalledTimes(0);
+    await removeCourseFromDb(courseString, Course);
+    expect(Course.findOne).toHaveBeenCalledTimes(1);
+    expect(Course.findOne).toHaveBeenCalledWith({ where: { name: courseString } });
+    expect(Course.destroy).toHaveBeenCalledTimes(0);
   });
 
   test("remove group - if group then destroy", async () => {
     const courseString = "test";
-    await removeGroup(courseString, Groups);
-    expect(Groups.findOne).toHaveBeenCalledTimes(1);
-    expect(Groups.findOne).toHaveBeenCalledWith({ where: { course: courseString } });
-    expect(Groups.destroy).toHaveBeenCalledTimes(1);
-    expect(Groups.destroy).toHaveBeenCalledWith({ where: { course: courseString } });
+    await removeCourseFromDb(courseString, Course);
+    expect(Course.findOne).toHaveBeenCalledTimes(1);
+    expect(Course.findOne).toHaveBeenCalledWith({ where: { name: courseString } });
+    expect(Course.destroy).toHaveBeenCalledTimes(1);
+    expect(Course.destroy).toHaveBeenCalledWith({ where: { name: courseString } });
   });
 
   test("change ms to dorrect mm:ss format", () => {
     const time = "5:05";
     const result = msToMinutesAndSeconds(305000);
     expect(time).toMatch(result);
+  });
+
+  test("create a new channel if it does not exist", async () => {
+    client.guild.channels.init();
+    const channelObject = { name: "test", options: { type: "text" } };
+    const guild = client.guild;
+    await findOrCreateChannel(channelObject, guild);
+    expect(guild.channels.create).toHaveBeenCalledTimes(1);
+    expect(guild.channels.create).toHaveBeenCalledWith(channelObject.name, channelObject.options);
+  });
+
+  test("Dont create a new channel if exists", async () => {
+    const channelObject = { name: "test", options: { type: "text" } };
+    const guild = client.guild;
+    await findOrCreateChannel(channelObject, guild);
+    expect(guild.channels.create).toHaveBeenCalledTimes(0);
+  });
+
+  test("setCourse positions", async () => {
+    client.guild.channels.init();
+    client.guild.channels.create("📚 testA", { type: "category" });
+    const categoryA = client.guild.channels.cache.find(c => c.name === "📚 testA");
+    setCoursePositionABC(client.guild, "📚 testA");
+    expect(categoryA.edit).toHaveBeenCalledTimes(1);
+  });
+
+  test("valid private category is course category", async () => {
+    const privateCategoryName = "🔒 test";
+    const channel = { name: privateCategoryName };
+    const result = isACourseCategory(channel);
+    expect(result).toBe(true);
+  });
+
+  test("channel without emoji is not course category", async () => {
+    const privateCategoryName = "test";
+    const channel = { name: privateCategoryName };
+    const result = isACourseCategory(channel);
+    expect(result).toBe(false);
+  });
+
+  test("trimmer returs correct string public", async () => {
+    const category = "test";
+    const privateCategoryName = "📚 test";
+    const channel = { name: privateCategoryName };
+    const result = trimCourseName(channel);
+    expect(result).toBe(category);
+  });
+
+  test("trimmer returs correct string private", async () => {
+    const category = "test";
+    const privateCategoryName = "🔒 test";
+    const channel = { name: privateCategoryName };
+    const result = trimCourseName(channel);
+    expect(result).toBe(category);
+  });
+
+  test("find all channel names", async () => {
+    client.guild.channels.init();
+    const guild = client.guild;
+    guild.channels.cache.set(1, { name: "🔒 test" });
+    guild.channels.cache.set(2, { name: "testing" });
+    const channelNames = ["test"];
+    const result = findAllCourseNames(guild);
+    expect(result).toStrictEqual(channelNames);
+  });
+
+  test("find all channel names", async () => {
+    client.guild.channels.init();
+    const guild = client.guild;
+    guild.channels.cache.set(1, { name: "🔒 test" });
+    guild.channels.cache.set(2, { name: "testing" });
+    const channelNames = ["test"];
+    const result = findAllCourseNames(guild);
+    expect(result).toStrictEqual(channelNames);
   });
 });

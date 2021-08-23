@@ -1,4 +1,5 @@
 const { findOrCreateRoleWithName, updateGuide } = require("./service");
+const { facultyRole } = require("../../../config.json");
 
 const findOrCreateChannel = (guild, channelObject) => {
   const { name, options } = channelObject;
@@ -18,9 +19,12 @@ const initChannels = async (guild, client) => {
       name: "commands",
       options: {
         type: "text",
-        permissionOverwrites: [{ id: guild.id, deny: ["SEND_MESSAGES", "VIEW_CHANNEL"] },
+        permissionOverwrites: [
+          { id: guild.id, deny: ["SEND_MESSAGES", "VIEW_CHANNEL"] },
           { id: client.user.id, allow: ["SEND_MESSAGES", "VIEW_CHANNEL"] },
-          { id: admin.id, allow: ["SEND_MESSAGES", "VIEW_CHANNEL"] }] },
+          { id: admin.id, allow: ["SEND_MESSAGES", "VIEW_CHANNEL"] },
+        ],
+      },
     },
     {
       name: "guide",
@@ -38,11 +42,11 @@ const initChannels = async (guild, client) => {
 };
 
 const initRoles = async (guild) => {
-  await findOrCreateRoleWithName("teacher", guild);
+  await findOrCreateRoleWithName(facultyRole, guild);
   await findOrCreateRoleWithName("admin", guild);
 };
 
-const setInitialGuideMessage = async (guild, channelName) => {
+const setInitialGuideMessage = async (guild, channelName, Course) => {
   const guideChannel = guild.channels.cache.find(c => c.type === "text" && c.name === channelName);
   if (!guideChannel.lastPinTimestamp) {
     const msg = await guideChannel.send("initial");
@@ -51,13 +55,13 @@ const setInitialGuideMessage = async (guild, channelName) => {
   const invs = await guild.fetchInvites();
   const guideinvite = invs.find(invite => invite.channel.name === "guide");
   if (!guideinvite) await guideChannel.createInvite({ maxAge: 0 });
-  await updateGuide(guild);
+  await updateGuide(guild, Course);
 };
 
-const initializeApplicationContext = async (client) => {
+const initializeApplicationContext = async (client, Course) => {
   await initRoles(client.guild);
   await initChannels(client.guild, client);
-  await setInitialGuideMessage(client.guild, "guide");
+  await setInitialGuideMessage(client.guild, "guide", Course);
 };
 
 module.exports = {

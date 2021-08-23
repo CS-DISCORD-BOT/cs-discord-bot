@@ -1,7 +1,8 @@
 const { updateGuide } = require("../../services/service");
 const { sendEphemeral } = require("../utils");
+const { courseAdminRole } = require("../../../../config.json");
 
-const execute = async (interaction, client) => {
+const execute = async (interaction, client, Course) => {
   const roleString = interaction.data.options[0].value.toLowerCase().trim();
 
   const guild = client.guild;
@@ -11,7 +12,7 @@ const execute = async (interaction, client) => {
   const courseRole = guild.roles.cache.find(r => r.name === roleString);
 
   const courseRoles = guild.roles.cache
-    .filter(r => (r.name === `${roleString} admin` || r.name === `${roleString}`))
+    .filter(r => (r.name === `${roleString} ${courseAdminRole}` || r.name === `${roleString}`))
     .map(r => r.name);
 
   if (!courseRoles.length) return sendEphemeral(client, interaction, `Invalid course name: ${roleString}`);
@@ -19,12 +20,12 @@ const execute = async (interaction, client) => {
 
   await member.roles.add(courseRole);
   sendEphemeral(client, interaction, `You have been added to a ${roleString} course.`);
-  await updateGuide(guild);
+  await updateGuide(guild, Course);
 };
 
 module.exports = {
   name: "join",
-  description: "Join a course, e.g. `/join ohpe`",
+  description: "Join a course, e.g., `/join ohpe`",
   usage: "[course name]",
   args: true,
   joinArgs: true,
